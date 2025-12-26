@@ -1,4 +1,0 @@
-config auth
-    option username ''
-    option password ''
-    option autologin '0'

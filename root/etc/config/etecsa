@@ -1,0 +1,5 @@
+config nauta
+	option username ''
+	option password ''
+	option pinghost 'visuales.uclv.cu'
+	option autologin '1'

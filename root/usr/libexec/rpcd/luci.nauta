@@ -1,0 +1,44 @@
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+
+case "$1" in
+	index)
+		json_init
+		json_add_string title "Nauta ETECSA 🌐"
+
+		STATUS="$(/usr/sbin/nauta-login.sh status)"
+		if [ "$STATUS" = "online" ]; then
+			json_add_string status "🟢 Conectado a Internet"
+		else
+			json_add_string status "⚪ Sin conexión"
+		fi
+
+		json_add_object form
+
+		json_add_string username "Usuario 👤"
+		json_add_string password "Contraseña 🔑"
+		json_add_string pinghost "Host de verificación 🌍"
+		json_add_string autologin "Auto login 🔁"
+
+		json_close_object
+
+		json_add_object values
+		json_add_string username "$(uci get etecsa.nauta.username 2>/dev/null)"
+		json_add_string pinghost "$(uci get etecsa.nauta.pinghost 2>/dev/null)"
+		json_add_string autologin "$(uci get etecsa.nauta.autologin 2>/dev/null)"
+		json_close_object
+
+		json_add_array buttons
+		json_add_object
+		json_add_string name "connect"
+		json_add_string title "Conectar ahora 🚀"
+		json_close_object
+		json_close_array
+
+		json_dump
+		;;
+
+	connect)
+		/usr/sbin/nauta-login.sh connect >/dev/null
+		;;
+esac

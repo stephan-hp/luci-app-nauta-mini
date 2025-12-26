@@ -1,26 +1,69 @@
 #!/bin/sh
 
-USER="$(uci get nauta.@auth[0].username 2>/dev/null)"
-PASS="$(uci get nauta.@auth[0].password 2>/dev/null)"
-AUTO="$(uci get nauta.@auth[0].autologin 2>/dev/null)"
+CONFIG="etecsa"
+SECTION="nauta"
 
-# limpiar espacios en blanco como trim
-USER="$(echo -n "$USER" | tr -d '[:space:]')"
-PASS="$(echo -n "$PASS" | tr -d '[:space:]')"
+TARGET_URL="https://secure.etecsa.net:8443/LoginServlet"
+LOGIN_PAGE="https://secure.etecsa.net:8443/"
 
-# ¿Auto login habilitado?
+# Leer configuración
+USER="$(uci get $CONFIG.$SECTION.username 2>/dev/null)"
+PASS="$(uci get $CONFIG.$SECTION.password 2>/dev/null)"
+PING_HOST="$(uci get $CONFIG.$SECTION.pinghost 2>/dev/null)"
+AUTOLOGIN="$(uci get $CONFIG.$SECTION.autologin 2>/dev/null)"
 
-[ "$AUTO" != "1" ] && exit 0
-[ -z "$USER" ] && exit 1
-[ -z "$PASS" ] && exit 1
+[ -z "$PING_HOST" ] && PING_HOST="visuales.uclv.cu"
 
-# ¿Internet activo? (Reemplazar en caso necesario)
-# ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1 && exit 0
-ping -c 1 -W 2 181.225.254.2 >/dev/null 2>&1 && exit 0 # Ping a visuales
+# -------- funciones --------
 
+check_internet() {
+	wget -q --timeout=8 --spider "http://$PING_HOST" >/dev/null 2>&1
+}
 
-# Login Nauta
-wget --no-check-certificate -q \
-  --post-data="username=$USER&password=$PASS" \
-  -O /dev/null \
-  https://secure.etecsa.net:8443/LoginServlet
+get_csrf() {
+	wget -qO- --no-check-certificate "$LOGIN_PAGE" \
+	| sed -n 's/.*name="CSRFHW" value="\([^"]*\)".*/\1/p'
+}
+
+do_login() {
+	CSRF="$(get_csrf)"
+
+	[ -z "$CSRF" ] && echo "❌ No se pudo obtener CSRF" && exit 1
+
+	wget -qO- --no-check-certificate \
+		--header="Content-Type: application/x-www-form-urlencoded" \
+		--post-data="\
+wlanuserip=&\
+wlanacname=&\
+wlanmac=&\
+firsturl=notFound.jsp&\
+ssid=&\
+usertype=&\
+gotopage=%2Fnauta_etecsa%2FLoginURL%2Fpc_login.jsp&\
+successpage=%2Fnauta_etecsa%2FOnlineURL%2Fpc_index.jsp&\
+loggerId=$(date +%s)&\
+lang=es_ES&\
+username=$USER&\
+password=$PASS&\
+CSRFHW=$CSRF" \
+	"$TARGET_URL" >/dev/null
+}
+
+# -------- ejecución --------
+
+case "$1" in
+	status)
+		if check_internet; then
+			echo "online"
+		else
+			echo "offline"
+		fi
+		;;
+	connect)
+		check_internet && exit 0
+		[ -z "$USER" -o -z "$PASS" ] && exit 1
+		do_login
+		sleep 3
+		check_internet && echo "online" || echo "offline"
+		;;
+esac

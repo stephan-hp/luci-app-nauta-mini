@@ -1,0 +1,13 @@
+{
+  "menu": {
+    "services/nauta": {
+      "title": "Nauta 🌐",
+      "order": 30,
+      "action": {
+        "type": "rpc",
+        "name": "nauta",
+        "method": "index"
+      }
+    }
+  }
+}
