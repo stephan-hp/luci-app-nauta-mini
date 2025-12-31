@@ -2,4 +2,6 @@ config nauta
 	option username ''
 	option password ''
 	option pinghost 'visuales.uclv.cu'
+	option check_interval '15'
+	option max_retries '5'
 	option autologin '1'
