@@ -1,0 +1,18 @@
+{
+  "luci-app-nauta": {
+    "description": "Permisos para Nauta",
+    "read": {
+      "uci": [ "etecsa" ],
+      "file": {
+        "/usr/sbin/nauta-login.sh": [ "exec" ]
+      }
+    },
+    "write": {
+      "uci": [ "etecsa" ],
+      "file": {
+        "/usr/sbin/nauta-login.sh": [ "exec" ],
+        "/etc/cron.d/nauta": [ "write" ]
+      }
+    }
+  }
+}

@@ -25,11 +25,12 @@ echo_log() {
 
 # default values
 [ -z "$CHECK_INTERVAL" ] && CHECK_INTERVAL=15
-[ -z "$MAX_RETRIES" ] && MAX_RETRIES=5
+[ -z "$MAX_RETRIES" ] && MAX_RETRIES=0
 [ -z "$AUTOLOGIN" ] && AUTOLOGIN=0
 [ -z "$PING_HOST" ] && PING_HOST="visuales.uclv.cu"
 
 case "$1" in
+
 	status)
 		if ping -c1 -W2 "$PING_HOST" >/dev/null 2>&1; then
 			echo online
@@ -38,6 +39,52 @@ case "$1" in
 		fi
 		exit 0
 	;;
+
+    connect)
+        echo_log "[*] Iniciando conexión manual..."
+    ;;
+
+    *)
+        if [ "$AUTOLOGIN" -ne 1 ]; then
+            echo_log "[*] Auto-login deshabilitado, saliendo."
+            exit 0
+        fi
+        # Auto-login enabled, MAX_RETRIES = 0 means infinite retries
+        if [ "$MAX_RETRIES" -eq 0 ]; then
+            MAX_RETRIES="Infinity"
+        fi
+
+        echo_log "[*] Iniciando auto-login (máx $MAX_RETRIES reintentos cada $CHECK_INTERVAL s)..."
+        RETRY_COUNT=0
+        if [ "$MAX_RETRIES" = "Infinity" ]; then
+            while true; do
+                if check_internet; then
+                    echo_log "[✓] Conexión a Internet establecida."
+                    exit 0
+                else
+                    echo_log "[!] No hay conexión a Internet. Intento $((RETRY_COUNT + 1))."
+                    /usr/sbin/nauta-login.sh connect
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    sleep $CHECK_INTERVAL
+                fi
+            done
+        fi
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if check_internet; then
+                echo_log "[✓] Conexión a Internet establecida."
+                exit 0
+            else
+                echo_log "[!] No hay conexión a Internet. Intento $((RETRY_COUNT + 1)) de $MAX_RETRIES."
+                /usr/sbin/nauta-login.sh connect
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                sleep $CHECK_INTERVAL
+            fi
+        done
+        echo_log "[!] ERROR: No se pudo establecer conexión a Internet después de $MAX_RETRIES intentos."
+        exit 1
+    ;;
+
 esac
 
 echo_log "[*] Iniciando script de login..."
