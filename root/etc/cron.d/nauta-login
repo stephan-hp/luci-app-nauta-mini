@@ -1,0 +1,1 @@
+*/1 * * * * /usr/sbin/nauta-login.sh >> /tmp/nauta.log 2>&1

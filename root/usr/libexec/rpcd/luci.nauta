@@ -1,44 +1,99 @@
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 
+CONFIG="etecsa"
+SECTION="nauta"
+CRON="/etc/cron.d/nauta-login"
+
+get() { uci get $CONFIG.$SECTION.$1 2>/dev/null; }
+
 case "$1" in
 	index)
 		json_init
 		json_add_string title "Nauta ETECSA 🌐"
 
 		STATUS="$(/usr/sbin/nauta-login.sh status)"
-		if [ "$STATUS" = "online" ]; then
-			json_add_string status "🟢 Conectado a Internet"
-		else
-			json_add_string status "⚪ Sin conexión"
-		fi
+		[ "$STATUS" = "online" ] \
+			&& json_add_string status "🟢 Conectado a Internet" \
+			|| json_add_string status "⚪ Sin conexión"
 
+		# === FORMULARIO ===
 		json_add_object form
 
-		json_add_string username "Usuario 👤"
-		json_add_string password "Contraseña 🔑"
-		json_add_string pinghost "Host de verificación 🌍"
-		json_add_string autologin "Auto login 🔁"
+		json_add_object username
+			json_add_string title "Usuario 👤"
+			json_add_string description "Cuenta Nauta (ej: usuario@nauta.com.cu)"
+		json_close_object
+
+		json_add_object password
+			json_add_string title "Contraseña 🔑"
+			json_add_string description "Contraseña de la cuenta Nauta"
+			json_add_boolean password true
+		json_close_object
+
+		json_add_object pinghost
+			json_add_string title "Host de verificación 🌍"
+			json_add_string description "Servidor usado para comprobar Internet"
+		json_close_object
+
+		json_add_object autologin
+			json_add_string title "Auto-login 🔁"
+			json_add_string description "Reintentar conexión automáticamente (cron)"
+			json_add_boolean boolean true
+		json_close_object
 
 		json_close_object
 
+		# === VALORES ===
 		json_add_object values
-		json_add_string username "$(uci get etecsa.nauta.username 2>/dev/null)"
-		json_add_string pinghost "$(uci get etecsa.nauta.pinghost 2>/dev/null)"
-		json_add_string autologin "$(uci get etecsa.nauta.autologin 2>/dev/null)"
+		json_add_string username "$(get username)"
+		json_add_string pinghost "$(get pinghost || echo visuales.uclv.cu)"
+		json_add_boolean autologin "$(get autologin)"
 		json_close_object
 
+		# === BOTONES ===
 		json_add_array buttons
-		json_add_object
-		json_add_string name "connect"
-		json_add_string title "Conectar ahora 🚀"
-		json_close_object
+			json_add_object
+				json_add_string name "connect"
+				json_add_string title "Conectar ahora 🚀"
+			json_close_object
 		json_close_array
 
+		# === LOGS ===
+		json_add_string log "$(
+			logread | grep nauta | tail -n 20
+		)"
+
 		json_dump
-		;;
+	;;
 
 	connect)
-		/usr/sbin/nauta-login.sh connect >/dev/null
-		;;
+		/usr/sbin/nauta-login.sh connect >/dev/null &
+	;;
+
+	save)
+		read input
+		json_load "$input"
+
+		json_get_var v username
+		uci set $CONFIG.$SECTION.username="$v"
+
+		json_get_var v password
+		uci set $CONFIG.$SECTION.password="$v"
+
+		json_get_var v pinghost
+		uci set $CONFIG.$SECTION.pinghost="$v"
+
+		json_get_var v autologin
+		uci set $CONFIG.$SECTION.autologin="$v"
+
+		uci commit $CONFIG
+
+		# cron on/off
+		if [ "$v" = "1" ]; then
+			[ -f "$CRON" ] || echo "*/1 * * * * /usr/sbin/nauta-login.sh" > "$CRON"
+		else
+			rm -f "$CRON"
+		fi
+	;;
 esac
