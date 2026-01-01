@@ -1,12 +1,21 @@
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 
+readonly rpcdCompat='17'
+
+[ -x "/usr/sbin/nauta-login.sh" ] || {
+    print_json_string 'error' "nauta-login.sh not found or not executable"
+    exit 1
+}
+
+
 CONFIG="etecsa"
 SECTION="nauta"
 
 get() { uci get $CONFIG.$SECTION.$1 2>/dev/null; }
 
 case "$1" in
+
 	index)
 		json_init
 		json_add_string title "Nauta ETECSA 🌐"
@@ -76,7 +85,7 @@ case "$1" in
 	;;
 
 	save)
-		read input
+		input=$(cat)
 		json_load "$input"
 
 		json_get_var v username
