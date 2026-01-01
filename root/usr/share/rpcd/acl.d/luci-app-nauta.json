@@ -11,7 +11,7 @@
       "uci": [ "etecsa" ],
       "file": {
         "/usr/sbin/nauta-login.sh": [ "exec" ],
-        "/etc/cron.d/nauta": [ "write" ]
+        "/etc/crontab/root": [ "write" ]
       }
     }
   }

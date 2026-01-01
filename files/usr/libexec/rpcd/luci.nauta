@@ -3,7 +3,6 @@
 
 CONFIG="etecsa"
 SECTION="nauta"
-CRON="/etc/cron.d/nauta-login"
 
 get() { uci get $CONFIG.$SECTION.$1 2>/dev/null; }
 
@@ -20,27 +19,32 @@ case "$1" in
 		# === FORMULARIO ===
 		json_add_object form
 
-		json_add_object username
-			json_add_string title "Usuario 👤"
-			json_add_string description "Cuenta Nauta (ej: usuario@nauta.com.cu)"
-		json_close_object
+			json_add_object username
+				json_add_string title "Usuario 👤"
+				json_add_string description "Cuenta Nauta (ej: usuario@nauta.com.cu)"
+			json_close_object
 
-		json_add_object password
-			json_add_string title "Contraseña 🔑"
-			json_add_string description "Contraseña de la cuenta Nauta"
-			json_add_boolean password true
-		json_close_object
+			json_add_object password
+				json_add_string title "Contraseña 🔑"
+				json_add_string description "Contraseña de la cuenta Nauta"
+				json_add_boolean password true
+			json_close_object
 
-		json_add_object pinghost
-			json_add_string title "Host de verificación 🌍"
-			json_add_string description "Servidor usado para comprobar Internet"
-		json_close_object
+			json_add_object pinghost
+				json_add_string title "Host de verificación 🌍"
+				json_add_string description "Servidor usado para comprobar Internet"
+			json_close_object
 
-		json_add_object autologin
-			json_add_string title "Auto-login 🔁"
-			json_add_string description "Reintentar conexión automáticamente (cron)"
-			json_add_boolean boolean true
-		json_close_object
+			# cron status
+			json_add_object autologin
+				json_add_string title "Auto-login 🔁"
+				json_add_string description "Reintentar conexión automáticamente (cada minuto) si se pierde el acceso a Internet"
+				if [ "$(get autologin)" = "1" ]; then
+					json_add_boolean value true
+				else
+					json_add_boolean value false
+				fi
+			json_close_object
 
 		json_close_object
 
@@ -60,9 +64,9 @@ case "$1" in
 		json_close_array
 
 		# === LOGS ===
-		json_add_string log "$(
-			logread | grep nauta | tail -n 20
-		)"
+		loglines=$(logread | grep nauta | tail -n 20 | sed 's/"/\\"/g' | tr -d '\r')
+		json_add_string log "$loglines"
+
 
 		json_dump
 	;;
@@ -90,10 +94,18 @@ case "$1" in
 		uci commit $CONFIG
 
 		# cron on/off
+		CRON_FILE="/etc/crontabs/root"
+
 		if [ "$v" = "1" ]; then
-			[ -f "$CRON" ] || echo "*/1 * * * * /usr/sbin/nauta-login.sh" > "$CRON"
+			CRON_LINE="*/1 * * * * /usr/sbin/nauta-login.sh >/tmp/nauta.log 2>&1"
+
+			grep -q "nauta-login.sh" "$CRON_FILE" 2>/dev/null || \
+				echo "$CRON_LINE" >> "$CRON_FILE"
+
 		else
-			rm -f "$CRON"
+			sed -i '/nauta-login.sh/d' "$CRON_FILE"
 		fi
+		
+		/etc/init.d/cron restart
 	;;
 esac
